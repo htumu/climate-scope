@@ -1,6 +1,7 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import * as d3 from "d3";
 import { formatMetric } from "../utils";
+import { apiUrl } from "../api";
 
 type ClimatePoint = {
   country: string;
@@ -245,7 +246,7 @@ function ChoroplethMap() {
     async function loadMetaAndMap() {
       try {
         const [metaRes, worldRes] = await Promise.all([
-          fetch("http://127.0.0.1:5001/api/risk-meta"),
+          fetch(apiUrl("/api/risk-meta")),
           d3.json<WorldCollection>(
             "https://raw.githubusercontent.com/holtzy/D3-graph-gallery/master/DATA/world.geojson",
           ),
@@ -316,7 +317,7 @@ function ChoroplethMap() {
 
     async function loadMapValues() {
       try {
-        const url = `http://127.0.0.1:5001/api/risk-map?metric=${encodeURIComponent(metric)}&year=${year}`;
+        const url = apiUrl(`/api/risk-map?metric=${encodeURIComponent(metric)}&year=${year}`);
         const res = await fetch(url);
         if (!res.ok) {
           throw new Error("Failed to load /api/risk-map");
@@ -436,7 +437,7 @@ function ChoroplethMap() {
 
     const timer = window.setTimeout(async () => {
       try {
-        const url = `http://127.0.0.1:5001/api/climate-news?country=${encodeURIComponent(selectedCountry)}&limit=5`;
+        const url = apiUrl(`/api/climate-news?country=${encodeURIComponent(selectedCountry)}&limit=5`);
         const res = await fetch(url, { signal: controller.signal });
         const raw: unknown = await res.json().catch(() => null);
 

@@ -1,6 +1,7 @@
 import { useEffect, useRef, useState } from 'react'
 import * as d3 from 'd3'
 import { formatMetric } from '../utils'
+import { apiUrl } from '../api'
 
 type ClimateMeta = {
     years: number[]
@@ -69,7 +70,7 @@ function BubbleScatterPlot() {
 
         async function loadMeta() {
             try {
-                const metaRes = await fetch('http://127.0.0.1:5001/api/risk-meta')
+                const metaRes = await fetch(apiUrl('/api/risk-meta'))
                 if (!metaRes.ok) throw new Error('Failed to load /api/risk-meta')
                 const metaRaw: unknown = await metaRes.json()
                 if (!isClimateMeta(metaRaw)) throw new Error('Unexpected response shape from /api/risk-meta')
@@ -107,7 +108,7 @@ function BubbleScatterPlot() {
                     sizeMetric,
                     year: String(scatterYear),
                 })
-                const res = await fetch(`http://127.0.0.1:5001/api/risk-scatter?${params}`)
+                const res = await fetch(apiUrl(`/api/risk-scatter?${params}`))
                 if (!res.ok) {
                     const errorBody = await res.json().catch(() => null)
                     throw new Error(errorBody?.error ?? 'Failed to load /api/risk-scatter')

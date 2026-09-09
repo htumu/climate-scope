@@ -33,7 +33,11 @@
 /backend/.env
 /backend/.DS_Store
 /backend/data/*
+!/backend/data/
+!/backend/data/nd_gain_country_year.csv
 /backend/scripts/*
+!/backend/scripts/
+!/backend/scripts/process_nd_gain.py
 
 to-do
 /resources 2

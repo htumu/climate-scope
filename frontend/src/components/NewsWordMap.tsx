@@ -1,5 +1,6 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import * as d3 from "d3";
+import { apiUrl } from "../api";
 
 type WordDatum = {
   text: string;
@@ -71,7 +72,7 @@ function NewsWordMap() {
       setError("");
       try {
         const url =
-          "http://127.0.0.1:5001/api/climate-news-wordmap?timespan=24h&maxrecords=80&top=60";
+          apiUrl("/api/climate-news-wordmap?timespan=24h&maxrecords=80&top=60");
         const res = await fetch(url);
         const raw: unknown = await res.json().catch(() => null);
 

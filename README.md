@@ -95,6 +95,7 @@ You can override the location in `backend/.env`:
 FLASK_RUN_PORT=5001
 ND_GAIN_CSV_PATH=/absolute/path/to/nd_gain_country_year.csv
 RELIEFWEB_APPNAME=your-approved-appname
+CORS_ORIGINS=http://localhost:5173
 ```
 
 Start Flask:
@@ -212,14 +213,52 @@ GET /api/risk-scatter?xMetric=vulnerability&yMetric=readiness&sizeMetric=vulnera
 
 ## Deployment Notes
 
-The application currently uses local development API URLs in the frontend. Before production deployment:
+The backend is configured to run on Heroku. The frontend uses `VITE_API_BASE_URL`, so it can be hosted separately and point to the Heroku backend.
 
-1. Move the backend URL into a frontend environment variable.
-2. Add a production WSGI server such as Gunicorn.
-3. Configure the Heroku port from the `PORT` environment variable.
-4. Configure `ND_GAIN_CSV_PATH` and `RELIEFWEB_APPNAME` as deployment variables.
-5. Ensure the normalized ND-GAIN CSV is available to the deployed backend.
-6. Restrict CORS to the deployed frontend origin.
+### Deploy the backend to Heroku
+
+From the project root:
+
+```bash
+heroku login
+heroku create your-climate-scope-api
+git push heroku main
+```
+
+Set the backend configuration variables:
+
+```bash
+heroku config:set RELIEFWEB_APPNAME=your-approved-appname
+heroku config:set CORS_ORIGINS=https://your-frontend-domain.example
+```
+
+Check the API:
+
+```bash
+curl https://your-climate-scope-api.herokuapp.com/api/risk-meta
+```
+
+### Build the frontend
+
+Create `frontend/.env.production` locally or configure the equivalent environment variable in the frontend hosting provider:
+
+```text
+VITE_API_BASE_URL=https://your-climate-scope-api.herokuapp.com
+```
+
+Then build:
+
+```bash
+cd frontend
+npm run build
+```
+
+Before production deployment:
+
+1. Use a production frontend host and set `VITE_API_BASE_URL` there.
+2. Keep the normalized ND-GAIN CSV available to the deployed backend.
+3. Restrict `CORS_ORIGINS` to the deployed frontend origin.
+4. Do not commit `.env` files or service credentials.
 
 No database is required for the current read-only dataset. PostgreSQL can be added later if the project gains user accounts, saved comparisons, scheduled updates, or larger data sources.
 
