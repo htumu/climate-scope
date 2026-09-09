@@ -2,7 +2,7 @@ import { useState } from 'react'
 import ChoroplethMap from './components/ChoroplethMap'
 import BubbleScatterPlot from './components/BubbleScatterPlot'
 import NewsWordMap from './components/NewsWordMap'
-import { formatMetric, METRIC_DESCRIPTIONS } from './utils'
+import { formatMetric, METRIC_GUIDE } from './utils'
 import './App.css'
 
 type View = 'choropleth' | 'scatter' | 'news'
@@ -96,11 +96,22 @@ function App() {
                 ✕
               </button>
             </div>
+            <p className="help-modal__intro">
+              ND-GAIN scores are comparative indicators, not percentages. For risk,
+              lower is better; for readiness, higher is better.
+            </p>
             <ul className="help-modal__list">
-              {Object.entries(METRIC_DESCRIPTIONS).map(([key, desc]) => (
+              {Object.entries(METRIC_GUIDE).map(([key, guide]) => (
                 <li key={key}>
-                  <strong>{formatMetric(key)}</strong>
-                  <p>{desc}</p>
+                  <div className="metric-guide__heading">
+                    <strong>{formatMetric(key)}</strong>
+                    <span>{guide.scale}</span>
+                  </div>
+                  <p>{guide.description}</p>
+                  <div className={`metric-guide__scale${guide.higherIsBetter ? ' metric-guide__scale--higher' : ' metric-guide__scale--lower'}`}>
+                    <span>{guide.lowerLabel}</span>
+                    <span>{guide.higherLabel}</span>
+                  </div>
                 </li>
               ))}
             </ul>

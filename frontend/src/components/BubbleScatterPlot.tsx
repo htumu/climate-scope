@@ -8,6 +8,10 @@ type ClimateMeta = {
     defaultMetric: string | null
 }
 
+type ScatterResponse = {
+    records: ScatterPoint[]
+}
+
 type ScatterPoint = {
     country: string
     x: number
@@ -24,10 +28,27 @@ type ScatterTooltipState = {
     sizeValue: number
 }
 
+function isScatterPoint(value: unknown): value is ScatterPoint {
+    if (typeof value !== 'object' || value === null) return false
+    const candidate = value as Partial<ScatterPoint>
+    return (
+        typeof candidate.country === 'string' &&
+        Number.isFinite(candidate.x) &&
+        Number.isFinite(candidate.y) &&
+        Number.isFinite(candidate.size)
+    )
+}
+
 function isClimateMeta(value: unknown): value is ClimateMeta {
     if (typeof value !== 'object' || value === null) return false
     const candidate = value as Partial<ClimateMeta>
     return Array.isArray(candidate.years) && Array.isArray(candidate.metrics)
+}
+
+function isScatterResponse(value: unknown): value is ScatterResponse {
+    if (typeof value !== 'object' || value === null) return false
+    const candidate = value as Partial<ScatterResponse>
+    return Array.isArray(candidate.records) && candidate.records.every(isScatterPoint)
 }
 
 function BubbleScatterPlot() {
@@ -41,33 +62,31 @@ function BubbleScatterPlot() {
     const [scatterError, setScatterError] = useState<string>('')
     const [scatterTooltip, setScatterTooltip] = useState<ScatterTooltipState | null>(null)
     const [isPlaying, setIsPlaying] = useState(false)
+    const [selectedCountry, setSelectedCountry] = useState<string>('')
 
     useEffect(() => {
         let cancelled = false
 
         async function loadMeta() {
             try {
-                const metaRes = await fetch('http://127.0.0.1:5001/api/kaggle-meta')
-                if (!metaRes.ok) throw new Error('Failed to load /api/kaggle-meta')
+                const metaRes = await fetch('http://127.0.0.1:5001/api/risk-meta')
+                if (!metaRes.ok) throw new Error('Failed to load /api/risk-meta')
                 const metaRaw: unknown = await metaRes.json()
-                if (!isClimateMeta(metaRaw)) throw new Error('Unexpected response shape from /api/kaggle-meta')
+                if (!isClimateMeta(metaRaw)) throw new Error('Unexpected response shape from /api/risk-meta')
                 if (!cancelled) {
                     setMeta(metaRaw)
                     if (metaRaw.years?.length) {
-                        setScatterYear(metaRaw.years[0])
+                        setScatterYear(metaRaw.years[metaRaw.years.length - 1])
                     }
-                    if (metaRaw.metrics.length >= 3) {
-                        setXMetric(metaRaw.metrics[0])
-                        setYMetric(metaRaw.metrics[1])
-                        setSizeMetric(metaRaw.metrics[2])
-                    } else if (metaRaw.metrics.length > 0) {
-                        setXMetric(metaRaw.metrics[0])
-                        setYMetric(metaRaw.metrics[0])
-                        setSizeMetric(metaRaw.metrics[0])
-                    }
+                    const metrics = new Set(metaRaw.metrics)
+                    setXMetric(metrics.has('vulnerability') ? 'vulnerability' : metaRaw.metrics[0] ?? '')
+                    setYMetric(metrics.has('readiness') ? 'readiness' : metaRaw.metrics[1] ?? metaRaw.metrics[0] ?? '')
+                    setSizeMetric(metrics.has('governance_readiness') ? 'governance_readiness' : metaRaw.metrics[2] ?? metaRaw.metrics[0] ?? '')
                 }
-            } catch {
-                // meta errors are non-fatal; scatter will stay empty
+            } catch (e) {
+                if (!cancelled) {
+                    setScatterError(e instanceof Error ? e.message : 'Failed to load risk metadata')
+                }
             }
         }
 
@@ -82,41 +101,25 @@ function BubbleScatterPlot() {
 
         async function loadScatterValues() {
             try {
-                const res = await fetch('http://127.0.0.1:5001/api/kaggle-data?limit=500')
+                const params = new URLSearchParams({
+                    xMetric,
+                    yMetric,
+                    sizeMetric,
+                    year: String(scatterYear),
+                })
+                const res = await fetch(`http://127.0.0.1:5001/api/risk-scatter?${params}`)
                 if (!res.ok) {
-                    throw new Error('Failed to load /api/kaggle-data')
+                    const errorBody = await res.json().catch(() => null)
+                    throw new Error(errorBody?.error ?? 'Failed to load /api/risk-scatter')
                 }
 
                 const rawData: unknown = await res.json()
-                if (!Array.isArray(rawData)) {
-                    throw new Error('Unexpected response shape from /api/kaggle-data')
+                if (!isScatterResponse(rawData)) {
+                    throw new Error('Unexpected response shape from /api/risk-scatter')
                 }
 
-                const filtered = rawData.filter((row: any) => {
-                    const rowYear = Number(row?.year)
-                    return (
-                        row &&
-                        typeof row.country === 'string' &&
-                        rowYear === scatterYear &&
-                        Number.isFinite(Number(row[xMetric])) &&
-                        Number.isFinite(Number(row[yMetric])) &&
-                        Number.isFinite(Number(row[sizeMetric]))
-                    )
-                })
-
-                const grouped = d3.rollups(
-                    filtered,
-                    (rows: any[]) => ({
-                        country: rows[0].country,
-                        x: d3.mean(rows, (r) => Number(r[xMetric])) ?? 0,
-                        y: d3.mean(rows, (r) => Number(r[yMetric])) ?? 0,
-                        size: d3.mean(rows, (r) => Number(r[sizeMetric])) ?? 0,
-                    }),
-                    (d: any) => d.country
-                ).map(([, value]) => value)
-
                 if (!cancelled) {
-                    setScatterRecords(grouped)
+                    setScatterRecords(rawData.records.filter(isScatterPoint))
                     setScatterError('')
                 }
             } catch (e) {
@@ -139,6 +142,7 @@ function BubbleScatterPlot() {
         const margin = { top: 20, right: 30, bottom: 70, left: 90 }
         const svg = d3.select(scatterSvgRef.current)
 
+        svg.interrupt()
         svg.selectAll('*').remove()
         svg.attr('width', width).attr('height', height)
 
@@ -161,9 +165,10 @@ function BubbleScatterPlot() {
             .domain([yExtent[0] - yPad, yExtent[1] + yPad])
             .range([height - margin.bottom, margin.top])
 
+        const sizeMax = Math.max(0, sizeExtent[1] ?? 0)
         const rScale = d3
             .scaleSqrt()
-            .domain([Math.max(0, sizeExtent[0] ?? 0), sizeExtent[1] ?? 1])
+            .domain([0, sizeMax || 1])
             .range([5, 18])
 
         const xAxis = d3.axisBottom(xScale).ticks(7).tickSize(0)
@@ -244,9 +249,9 @@ function BubbleScatterPlot() {
             .attr('cy', (d) => yScale(d.y))
             .attr('r', 0)
             .attr('fill', '#2563eb')
-            .attr('fill-opacity', 0.5)
-            .attr('stroke', '#1d4ed8')
-            .attr('stroke-width', 1.5)
+            .attr('fill-opacity', (d) => selectedCountry && d.country !== selectedCountry ? 0.12 : 0.5)
+            .attr('stroke', (d) => d.country === selectedCountry ? '#111827' : '#1d4ed8')
+            .attr('stroke-width', (d) => d.country === selectedCountry ? 3 : 1.5)
             .on('mousemove', (event: MouseEvent, d) => {
                 setScatterTooltip({
                     x: event.clientX,
@@ -257,6 +262,9 @@ function BubbleScatterPlot() {
                     sizeValue: d.size,
                 })
             })
+            .on('click', (_event: MouseEvent, d) => {
+                setSelectedCountry((current) => current === d.country ? '' : d.country)
+            })
             .on('mouseleave', () => {
                 setScatterTooltip(null)
             })
@@ -265,21 +273,25 @@ function BubbleScatterPlot() {
             .attr('r', (d) => rScale(d.size))
 
         // label only biggest few
-        const sortedBySize = [...scatterRecords].sort((a, b) => b.size - a.size).slice(0, 5)
+        const topCountries = [...scatterRecords].sort((a, b) => b.size - a.size).slice(0, 5)
+        const selectedPoint = scatterRecords.find((record) => record.country === selectedCountry)
+        const labelPoints = selectedPoint && !topCountries.some((record) => record.country === selectedCountry)
+            ? [...topCountries, selectedPoint]
+            : topCountries
 
         svg.append('g')
             .selectAll('text.country-label')
-            .data(sortedBySize)
+            .data(labelPoints)
             .join('text')
             .attr('class', 'country-label')
             .attr('x', (d) => xScale(d.x))
             .attr('y', (d) => yScale(d.y) - 12)
             .attr('text-anchor', 'middle')
-            .attr('fill', '#1f2937')
+                .attr('fill', (d) => d.country === selectedCountry ? '#111827' : '#1f2937')
             .style('font-size', '11px')
             .style('font-weight', '500')
             .text((d) => d.country)
-    }, [scatterRecords, xMetric, yMetric, scatterYear])
+            }, [scatterRecords, xMetric, yMetric, sizeMetric, scatterYear, selectedCountry])
 
     useEffect(() => {
         if (!isPlaying || !meta?.years?.length) return
@@ -335,6 +347,24 @@ function BubbleScatterPlot() {
                         </select>
                     </label>
 
+                    <label>
+                        Focus Country
+                        <select
+                            value={selectedCountry}
+                            onChange={(e) => setSelectedCountry(e.target.value)}
+                            disabled={!scatterRecords.length}
+                        >
+                            <option value="">All countries</option>
+                            {[...scatterRecords]
+                                .sort((a, b) => a.country.localeCompare(b.country))
+                                .map((record) => (
+                                    <option key={record.country} value={record.country}>
+                                        {record.country}
+                                    </option>
+                                ))}
+                        </select>
+                    </label>
+
                     <button
                         type="button"
                         className="play-btn"
@@ -365,7 +395,7 @@ function BubbleScatterPlot() {
                 </div>
 
                 <div className="scatter-plot-area">
-                    <h2>Exploration of Climate Change Factors Over Time</h2>
+                    <h2>Climate Vulnerability vs Policy Readiness</h2>
                     {scatterError ? <p style={{ color: '#b00020', margin: '0 0 8px' }}>{scatterError}</p> : null}
                     <svg
                         ref={scatterSvgRef}

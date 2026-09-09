@@ -95,5 +95,47 @@ class NdGainService:
             "records": records.to_dict(orient="records"),
         }
 
+    def get_scatter(
+        self,
+        x_metric: str,
+        y_metric: str,
+        size_metric: str,
+        *,
+        year: Optional[int] = None,
+    ) -> Dict[str, Any]:
+        data = self.get_data()
+        metrics = [
+            column
+            for column in data.columns
+            if column not in self._required_columns
+        ]
+        requested_metrics = {x_metric, y_metric, size_metric}
+        unknown_metrics = requested_metrics - set(metrics)
+        if unknown_metrics:
+            raise ValueError(
+                f"Unknown ND-GAIN metric(s): {', '.join(sorted(unknown_metrics))}"
+            )
+
+        available_years = sorted(data["year"].unique().astype(int).tolist())
+        chosen_year = available_years[-1] if year is None else year
+        if chosen_year not in available_years:
+            raise ValueError(f"Unknown year: {chosen_year}")
+
+        filtered = data[data["year"] == chosen_year]
+        records = filtered[["country_code", "country"]].copy()
+        records["x"] = filtered[x_metric].to_numpy()
+        records["y"] = filtered[y_metric].to_numpy()
+        records["size"] = filtered[size_metric].to_numpy()
+        records = records.dropna(subset=["x", "y", "size"])
+
+        return {
+            "datasetRef": os.path.basename(self._csv_path),
+            "year": chosen_year,
+            "xMetric": x_metric,
+            "yMetric": y_metric,
+            "sizeMetric": size_metric,
+            "records": records.to_dict(orient="records"),
+        }
+
 
 nd_gain_service = NdGainService()

@@ -596,6 +596,16 @@
   color: #1f2937;
 }
 
+.help-modal__intro {
+  margin: 0 0 20px;
+  padding: 10px 12px;
+  border-left: 3px solid #1565c0;
+  background: #f0f7ff;
+  color: #334155;
+  font-size: 12px;
+  line-height: 1.5;
+}
+
 .help-modal__close {
   background: none;
   border: none;
@@ -637,11 +647,52 @@
   margin-bottom: 3px;
 }
 
+.metric-guide__heading {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 12px;
+}
+
+.metric-guide__heading span {
+  color: #64748b;
+  font-size: 10px;
+  font-weight: 600;
+  white-space: nowrap;
+}
+
 .help-modal__list li p {
   margin: 0;
   font-size: 13px;
   color: #6b7280;
   line-height: 1.5;
+}
+
+.metric-guide__scale {
+  display: flex;
+  justify-content: space-between;
+  gap: 10px;
+  margin-top: 9px;
+  padding-top: 16px;
+  position: relative;
+  color: #475569;
+  font-size: 10px;
+  font-weight: 700;
+}
+
+.metric-guide__scale::before {
+  content: '';
+  position: absolute;
+  top: 4px;
+  left: 0;
+  right: 0;
+  height: 6px;
+  border-radius: 999px;
+  background: linear-gradient(90deg, #28a745 0%, #f2c94c 50%, #d64545 100%);
+}
+
+.metric-guide__scale--higher::before {
+  background: linear-gradient(90deg, #d64545 0%, #f2c94c 50%, #28a745 100%);
 }
 
 .placeholder-card__text {

@@ -343,6 +343,39 @@ def risk_map():
         return jsonify({"error": str(e)}), 500
 
 
+@climate_data_bp.route("/api/risk-scatter")
+def risk_scatter():
+    """Return country-level ND-GAIN metrics for a scatter plot."""
+    x_metric = (request.args.get("xMetric") or "vulnerability").strip()
+    y_metric = (request.args.get("yMetric") or "readiness").strip()
+    size_metric = (
+        request.args.get("sizeMetric") or "governance_readiness"
+    ).strip()
+    year_raw = request.args.get("year")
+
+    if year_raw is None or year_raw == "":
+        year = None
+    else:
+        try:
+            year = int(year_raw)
+        except ValueError:
+            return jsonify({"error": "year must be an integer"}), 400
+
+    try:
+        return jsonify(
+            nd_gain_service.get_scatter(
+                x_metric,
+                y_metric,
+                size_metric,
+                year=year,
+            )
+        ), 200
+    except ValueError as e:
+        return jsonify({"error": str(e)}), 400
+    except Exception as e:
+        return jsonify({"error": str(e)}), 500
+
+
 @climate_data_bp.route("/api/climate-news")
 def climate_news():
     """Return latest climate change news coverage for a hovered region.
