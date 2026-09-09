@@ -8,6 +8,7 @@ from services.kaggle_service import (
 )
 from services.reliefweb_service import reliefweb_service
 from services.gdelt_service import extract_top_words, gdelt_service
+from services.nd_gain_service import nd_gain_service
 from services.worldbank_service import worldbank_service
 
 climate_data_bp = Blueprint("climate_data_bp", __name__)
@@ -307,6 +308,37 @@ def kaggle_meta():
     """Kaggle metadata (years and numeric metrics) only."""
     try:
         return _get_kaggle_meta_response()
+    except Exception as e:
+        return jsonify({"error": str(e)}), 500
+
+
+@climate_data_bp.route("/api/risk-meta")
+def risk_meta():
+    """Return available ND-GAIN metrics and years."""
+    try:
+        return jsonify(nd_gain_service.get_meta()), 200
+    except Exception as e:
+        return jsonify({"error": str(e)}), 500
+
+
+@climate_data_bp.route("/api/risk-map")
+def risk_map():
+    """Return one ND-GAIN metric by country for a selected year."""
+    metric = (request.args.get("metric") or "vulnerability").strip()
+    year_raw = request.args.get("year")
+
+    if year_raw is None or year_raw == "":
+        year = None
+    else:
+        try:
+            year = int(year_raw)
+        except ValueError:
+            return jsonify({"error": "year must be an integer"}), 400
+
+    try:
+        return jsonify(nd_gain_service.get_map(metric, year=year)), 200
+    except ValueError as e:
+        return jsonify({"error": str(e)}), 400
     except Exception as e:
         return jsonify({"error": str(e)}), 500
 

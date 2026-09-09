@@ -45,11 +45,20 @@ type WorldCollection = GeoJSON.FeatureCollection<
   { name?: string }
 >;
 
+const COUNTRY_ALIASES: Record<string, string> = {
+  USA: "United States",
+  "United Republic of Tanzania": "Tanzania, United Republic of",
+};
+
+function canonicalCountryName(country: string): string {
+  return COUNTRY_ALIASES[country] ?? country;
+}
+
 function toDataMap(records: ClimatePoint[]): Map<string, number> {
   const map = new Map<string, number>();
   for (const row of records) {
     if (typeof row.country === "string" && Number.isFinite(row.value)) {
-      map.set(row.country, Number(row.value));
+      map.set(canonicalCountryName(row.country), Number(row.value));
     }
   }
   return map;
@@ -236,30 +245,25 @@ function ChoroplethMap() {
     async function loadMetaAndMap() {
       try {
         const [metaRes, worldRes] = await Promise.all([
-          fetch("http://127.0.0.1:5001/api/climate-meta"),
+          fetch("http://127.0.0.1:5001/api/risk-meta"),
           d3.json<WorldCollection>(
             "https://raw.githubusercontent.com/holtzy/D3-graph-gallery/master/DATA/world.geojson",
           ),
         ]);
 
         if (!metaRes.ok) {
-          throw new Error("Failed to load /api/climate-meta");
+          throw new Error("Failed to load /api/risk-meta");
         }
 
         const metaRaw: unknown = await metaRes.json();
         if (!isClimateMeta(metaRaw)) {
-          throw new Error("Unexpected response shape from /api/climate-meta");
+          throw new Error("Unexpected response shape from /api/risk-meta");
         }
 
         const metaJson = metaRaw;
         if (!cancelled) {
           setMeta(metaJson);
-          const alphabeticallyFirstMetric =
-            [...(metaJson.metrics ?? [])].sort((a, b) =>
-              a.localeCompare(b),
-            )[0] ?? "";
           const initialMetric =
-            alphabeticallyFirstMetric ||
             metaJson.defaultMetric ||
             metaJson.metrics?.[0] ||
             "";
@@ -312,14 +316,14 @@ function ChoroplethMap() {
 
     async function loadMapValues() {
       try {
-        const url = `http://127.0.0.1:5001/api/climate-map?metric=${encodeURIComponent(metric)}&year=${year}`;
+        const url = `http://127.0.0.1:5001/api/risk-map?metric=${encodeURIComponent(metric)}&year=${year}`;
         const res = await fetch(url);
         if (!res.ok) {
-          throw new Error("Failed to load /api/climate-map");
+          throw new Error("Failed to load /api/risk-map");
         }
         const rawData: unknown = await res.json();
         if (!isClimateMapResponse(rawData)) {
-          throw new Error("Unexpected response shape from /api/climate-map");
+          throw new Error("Unexpected response shape from /api/risk-map");
         }
 
         const data = rawData;
@@ -367,7 +371,7 @@ function ChoroplethMap() {
       .attr("d", (d) => path(d) ?? "")
       .attr("fill", (d) => {
         const name = d.properties?.name ?? "";
-        const val = dataMap.get(name);
+        const val = dataMap.get(canonicalCountryName(name));
         return typeof val === "number"
           ? colorScaleInfo.colorFor(val)
           : "#d9d9d9";
@@ -377,21 +381,21 @@ function ChoroplethMap() {
 
     countryPaths
       .on("mouseover", (_event: MouseEvent, d) => {
-        const countryName = d.properties?.name ?? "";
+        const countryName = canonicalCountryName(d.properties?.name ?? "");
         if (!countryName) return;
         if (!pinnedCountryRef.current) {
           setPendingHoverCountry(countryName);
         }
       })
       .on("click", (_event: MouseEvent, d) => {
-        const countryName = d.properties?.name ?? "";
+        const countryName = canonicalCountryName(d.properties?.name ?? "");
         if (!countryName) return;
         setPinnedCountry((prev) => (prev === countryName ? null : countryName));
         setHoverCountry(countryName);
         setPendingHoverCountry(null);
       })
       .on("mousemove", (event: MouseEvent, d) => {
-        const countryName = d.properties?.name ?? "Unknown";
+        const countryName = canonicalCountryName(d.properties?.name ?? "Unknown");
         const val = dataMap.get(countryName);
         setTooltip({
           x: event.clientX,
