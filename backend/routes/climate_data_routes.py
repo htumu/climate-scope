@@ -2,11 +2,22 @@ import os
 
 import pandas as pd
 from flask import Blueprint, jsonify, request
-from services.kaggle_service import kaggle_service
+from services.kaggle_service import (
+    KAGGLE_CLIMATE_DATASET_REF_ENV,
+    kaggle_service,
+)
 from services.reliefweb_service import reliefweb_service
+from services.gdelt_service import extract_top_words, gdelt_service
 from services.worldbank_service import worldbank_service
 
 climate_data_bp = Blueprint("climate_data_bp", __name__)
+
+
+def _safe_get_kaggle_data():
+    try:
+        return _get_kaggle_data()
+    except Exception:
+        return None
 
 
 def _get_limit_arg(default: str = "100") -> int:
@@ -20,10 +31,13 @@ def _get_limit_arg(default: str = "100") -> int:
 
 def _get_worldbank_data_response():
     worldbank_df = worldbank_service.get_climate_change_data()
-    kaggle_df = _get_kaggle_data()
+    kaggle_df = _safe_get_kaggle_data()
 
-    # Merge by country-year so Kaggle features are available alongside WB metrics.
-    data = worldbank_df.merge(kaggle_df, on=["country", "year"], how="outer")
+    if kaggle_df is not None:
+        # Merge by country-year so Kaggle features are available alongside WB metrics.
+        data = worldbank_df.merge(kaggle_df, on=["country", "year"], how="outer")
+    else:
+        data = worldbank_df
     limit_int = _get_limit_arg("100")
     records = data.head(limit_int).to_dict(orient="records")
     return jsonify(records), 200
@@ -31,39 +45,47 @@ def _get_worldbank_data_response():
 
 def _get_worldbank_meta_response():
     meta = worldbank_service.get_climate_meta()
-    kaggle_df = _get_kaggle_data()
-    kaggle_metrics = _get_kaggle_metric_columns(kaggle_df)
 
-    kaggle_years = sorted(
-        [int(y) for y in kaggle_df["year"].dropna().unique().tolist()]
-    )
-    kaggle_metric_years = {
-        metric: sorted(
-            [
-                int(y)
-                for y in kaggle_df.loc[kaggle_df[metric].notna(), "year"]
-                .dropna()
-                .unique()
-                .tolist()
-            ]
+    kaggle_df = _safe_get_kaggle_data()
+    if kaggle_df is not None:
+        kaggle_metrics = _get_kaggle_metric_columns(kaggle_df)
+
+        kaggle_years = sorted(
+            [int(y) for y in kaggle_df["year"].dropna().unique().tolist()]
         )
-        for metric in kaggle_metrics
-    }
+        kaggle_metric_years = {
+            metric: sorted(
+                [
+                    int(y)
+                    for y in kaggle_df.loc[kaggle_df[metric].notna(), "year"]
+                    .dropna()
+                    .unique()
+                    .tolist()
+                ]
+            )
+            for metric in kaggle_metrics
+        }
 
-    merged_metrics = meta.get("metrics", []) + [
-        m for m in kaggle_metrics if m not in set(meta.get("metrics", []))
-    ]
-    merged_years = sorted(set(meta.get("years", []) + kaggle_years))
+        merged_metrics = meta.get("metrics", []) + [
+            m for m in kaggle_metrics if m not in set(meta.get("metrics", []))
+        ]
+        merged_years = sorted(set(meta.get("years", []) + kaggle_years))
 
-    merged_metric_years = dict(meta.get("metricYears", {}))
-    merged_metric_years.update(kaggle_metric_years)
+        merged_metric_years = dict(meta.get("metricYears", {}))
+        merged_metric_years.update(kaggle_metric_years)
 
-    meta = {
-        **meta,
-        "years": merged_years,
-        "metrics": merged_metrics,
-        "metricYears": merged_metric_years,
-    }
+        meta = {
+            **meta,
+            "years": merged_years,
+            "metrics": merged_metrics,
+            "metricYears": merged_metric_years,
+            "kaggleAvailable": True,
+        }
+    else:
+        meta = {
+            **meta,
+            "kaggleAvailable": False,
+        }
     return jsonify(meta), 200
 
 
@@ -158,7 +180,7 @@ def _get_kaggle_map_response(metric: str, year: int | None, agg: str):
     grouped = grouped.rename(columns={metric: "value"}).dropna(subset=["value"])
 
     return {
-        "datasetRef": os.getenv("KAGGLE_CLIMATE_DATASET_REF", "algozee/climate-cahnge"),
+        "datasetRef": os.getenv(KAGGLE_CLIMATE_DATASET_REF_ENV, "").strip() or None,
         "year": chosen_year,
         "metric": metric,
         "agg": agg,

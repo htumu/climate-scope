@@ -10,6 +10,8 @@ from dotenv import load_dotenv
 BACKEND_ROOT = os.path.abspath(os.path.join(os.path.dirname(__file__), ".."))
 load_dotenv(dotenv_path=os.path.join(BACKEND_ROOT, ".env"))
 
+KAGGLE_CLIMATE_DATASET_REF_ENV = "KAGGLE_CLIMATE_DATASET_REF"
+
 
 class KaggleService:
     def _dataset_cache_dir(self, dataset_ref: str) -> str:
@@ -96,7 +98,11 @@ class KaggleService:
 
     def get_climate_change_data(self):
         """Load the default climate dataset (cached locally after first download)."""
-        dataset_ref = os.getenv("KAGGLE_CLIMATE_DATASET_REF", "algozee/climate-cahnge")
+        dataset_ref = os.getenv(KAGGLE_CLIMATE_DATASET_REF_ENV, "").strip()
+        if not dataset_ref:
+            raise RuntimeError(
+                f"Missing Kaggle dataset reference. Set {KAGGLE_CLIMATE_DATASET_REF_ENV} in backend/.env to an owner/dataset-slug value."
+            )
         expected_file = "climate_change_indicators.csv"
         try:
             return self.get_dataset_dataframe(dataset_ref, expected_file=expected_file)

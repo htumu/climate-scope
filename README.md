@@ -70,7 +70,7 @@ By default the backend listens on `http://127.0.0.1:5001` (configured via `FLASK
 GET /api/climate-data?limit=100
 ```
 
-This endpoint returns a JSON array of records (default 100 rows) from the `algozee/climate-cahnge` dataset. The backend caches the dataset under `backend/data/` after the first successful download, so subsequent requests mostly just load from disk.
+This endpoint returns a JSON array of records (default 100 rows) from the Kaggle dataset configured in `KAGGLE_CLIMATE_DATASET_REF`. The backend caches the dataset under `backend/data/` after the first successful download, so subsequent requests mostly just load from disk.
 
 Note: the first request after a fresh setup may take longer because it downloads the Kaggle dataset and extracts it.
 
@@ -86,7 +86,7 @@ Response shape:
 
 ```json
 {
-	"datasetRef": "algozee/climate-cahnge",
+	"datasetRef": "your/kaggle-dataset-slug",
 	"years": [2020, 2021, 2022],
 	"metrics": ["co2_concentration_ppm", "global_avg_temperature"],
 	"defaultMetric": "co2_concentration_ppm"
@@ -110,7 +110,7 @@ Response shape:
 
 ```json
 {
-	"datasetRef": "algozee/climate-cahnge",
+	"datasetRef": "your/kaggle-dataset-slug",
 	"year": 2020,
 	"metric": "co2_concentration_ppm",
 	"agg": "mean",
