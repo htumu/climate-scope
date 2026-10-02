@@ -39,7 +39,27 @@ class ReliefWebService:
 
     def _cache_key_str(self, cache_key: Tuple[str, int]) -> str:
         country, limit = cache_key
-        return f"{country}|{limit}"
+        return f"country-filter-v2|{country}|{limit}"
+
+    @staticmethod
+    def _normalize_country(value: str) -> str:
+        return " ".join(value.casefold().replace("'", "").split())
+
+    def _country_matches(self, fields: Dict[str, Any], requested: str) -> bool:
+        countries = fields.get("country")
+        if not isinstance(countries, list):
+            countries = [countries]
+
+        requested_normalized = self._normalize_country(requested)
+        for country in countries:
+            if isinstance(country, dict):
+                values = [country.get("name"), country.get("shortname")]
+            else:
+                values = [country]
+            for value in values:
+                if isinstance(value, str) and self._normalize_country(value) == requested_normalized:
+                    return True
+        return False
 
     def _load_disk_cache(self) -> None:
         try:
@@ -190,6 +210,7 @@ class ReliefWebService:
                     "url",
                     "source",
                     "date",
+                    "country",
                 ]
             },
         }
@@ -219,6 +240,9 @@ class ReliefWebService:
             fields = item.get("fields")
             if not isinstance(fields, dict):
                 fields = {}
+
+            if not self._country_matches(fields, country):
+                continue
 
             title = fields.get("title")
             if not isinstance(title, str):

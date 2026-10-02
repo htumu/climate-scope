@@ -35,7 +35,6 @@ type NewsArticle = {
 
 type NewsResponse = {
   country: string;
-  query: string;
   articles: NewsArticle[];
   warning?: string;
 };
@@ -48,7 +47,20 @@ type WorldCollection = GeoJSON.FeatureCollection<
 
 const COUNTRY_ALIASES: Record<string, string> = {
   USA: "United States",
+  Russia: "Russian Federation",
+  Bolivia: "Bolivia, Plurinational State of",
+  "Democratic Republic of the Congo": "Congo, the Democratic Republic o",
+  "Republic of the Congo": "Congo",
+  Laos: "Lao People's Democratic Republic",
+  Libya: "Libyan Arab Jamahiriya",
+  Venezuela: "Venezuela, Bolivarian Republic o",
+  Vietnam: "Viet Nam",
   "United Republic of Tanzania": "Tanzania, United Republic of",
+  Iran: "Iran, Islamic Republic of",
+  Syria: "Syrian Arab Republic",
+  "Macedonia, the former Yugoslav Republic of": "North Macedonia",
+  "North Korea": "Korea, Democratic People's Repub",
+  "South Korea": "Korea, Republic of",
 };
 
 function canonicalCountryName(country: string): string {
@@ -80,9 +92,7 @@ function isClimateMapResponse(value: unknown): value is ClimateMapResponse {
 function isNewsResponse(value: unknown): value is NewsResponse {
   if (typeof value !== "object" || value === null) return false;
   const candidate = value as Partial<NewsResponse>;
-  return (
-    typeof candidate.country === "string" && Array.isArray(candidate.articles)
-  );
+  return typeof candidate.country === "string" && Array.isArray(candidate.articles);
 }
 
 function formatMetricValue(value: number, metric: string): string {
@@ -114,60 +124,15 @@ function ChoroplethMap() {
   const [error, setError] = useState<string>("");
   const [tooltip, setTooltip] = useState<TooltipState | null>(null);
 
-  const [hoverCountry, setHoverCountry] = useState<string | null>(null);
-  const [pendingHoverCountry, setPendingHoverCountry] = useState<string | null>(
-    null,
-  );
   const [pinnedCountry, setPinnedCountry] = useState<string | null>(null);
-  const pinnedCountryRef = useRef<string | null>(null);
-  const selectedCountry = pinnedCountry ?? hoverCountry;
-
+  const selectedCountry = pinnedCountry;
   const [newsArticles, setNewsArticles] = useState<NewsArticle[]>([]);
   const [newsLoading, setNewsLoading] = useState(false);
-  const [newsError, setNewsError] = useState<string>("");
-  const [newsWarning, setNewsWarning] = useState<string>("");
-  const newsCacheRef = useRef<
-    Map<string, { articles: NewsArticle[]; warning?: string }>
-  >(new Map());
-  const newsListRef = useRef<HTMLOListElement | null>(null);
-
-  useEffect(() => {
-    pinnedCountryRef.current = pinnedCountry;
-  }, [pinnedCountry]);
-
-  useEffect(() => {
-    const el = newsListRef.current;
-    if (!el) return;
-
-    const raf = window.requestAnimationFrame(() => {
-      if (newsListRef.current) {
-        newsListRef.current.scrollTop = 0;
-      }
-    });
-
-    return () => {
-      window.cancelAnimationFrame(raf);
-    };
-  }, [selectedCountry]);
-
-  useEffect(() => {
-    if (pinnedCountry !== null) {
-      setPendingHoverCountry(null);
-      return;
-    }
-
-    if (!pendingHoverCountry) return;
-    if (pendingHoverCountry === hoverCountry) return;
-
-    const timer = window.setTimeout(() => {
-      if (pinnedCountryRef.current !== null) return;
-      setHoverCountry(pendingHoverCountry);
-    }, 350);
-
-    return () => {
-      window.clearTimeout(timer);
-    };
-  }, [pendingHoverCountry, pinnedCountry, hoverCountry]);
+  const [newsError, setNewsError] = useState("");
+  const [newsWarning, setNewsWarning] = useState("");
+  const newsCacheRef = useRef<Map<string, { articles: NewsArticle[]; warning: string }>>(
+    new Map(),
+  );
 
   const colorScaleInfo = useMemo(() => {
     const values = mapRecords
@@ -239,6 +204,64 @@ function ChoroplethMap() {
     }
     return meta.years ?? [];
   }, [meta, metric]);
+
+  const selectedValue = useMemo(() => {
+    if (!selectedCountry) return null;
+    return toDataMap(mapRecords).get(selectedCountry) ?? null;
+  }, [mapRecords, selectedCountry]);
+
+  useEffect(() => {
+    if (!selectedCountry) {
+      setNewsArticles([]);
+      setNewsLoading(false);
+      setNewsError("");
+      setNewsWarning("");
+      return;
+    }
+
+    const country = selectedCountry;
+
+    const cached = newsCacheRef.current.get(country);
+    if (cached) {
+      setNewsArticles(cached.articles);
+      setNewsWarning(cached.warning);
+      setNewsError("");
+      setNewsLoading(false);
+      return;
+    }
+
+    const controller = new AbortController();
+    setNewsLoading(true);
+    setNewsArticles([]);
+    setNewsError("");
+    setNewsWarning("");
+
+    async function loadCountryNews() {
+      try {
+        const url = apiUrl(`/api/climate-news?country=${encodeURIComponent(country)}&limit=4`);
+        const response = await fetch(url, { signal: controller.signal });
+        const raw: unknown = await response.json().catch(() => null);
+        if (!response.ok) {
+          const message = (raw as { error?: unknown } | null)?.error;
+          throw new Error(typeof message === "string" ? message : "Unable to load country reporting");
+        }
+        if (!isNewsResponse(raw)) throw new Error("Unexpected country reporting response");
+
+        const warning = raw.warning ?? "";
+        newsCacheRef.current.set(country, { articles: raw.articles, warning });
+        setNewsArticles(raw.articles);
+        setNewsWarning(warning);
+      } catch (error) {
+        if (controller.signal.aborted) return;
+        setNewsError(error instanceof Error ? error.message : "Unable to load country reporting");
+      } finally {
+        if (!controller.signal.aborted) setNewsLoading(false);
+      }
+    }
+
+    loadCountryNews();
+    return () => controller.abort();
+  }, [selectedCountry]);
 
   useEffect(() => {
     let cancelled = false;
@@ -381,19 +404,10 @@ function ChoroplethMap() {
       .attr("stroke-width", 0.6);
 
     countryPaths
-      .on("mouseover", (_event: MouseEvent, d) => {
-        const countryName = canonicalCountryName(d.properties?.name ?? "");
-        if (!countryName) return;
-        if (!pinnedCountryRef.current) {
-          setPendingHoverCountry(countryName);
-        }
-      })
       .on("click", (_event: MouseEvent, d) => {
         const countryName = canonicalCountryName(d.properties?.name ?? "");
         if (!countryName) return;
         setPinnedCountry((prev) => (prev === countryName ? null : countryName));
-        setHoverCountry(countryName);
-        setPendingHoverCountry(null);
       })
       .on("mousemove", (event: MouseEvent, d) => {
         const countryName = canonicalCountryName(d.properties?.name ?? "Unknown");
@@ -410,80 +424,11 @@ function ChoroplethMap() {
       });
   }, [world, mapRecords, colorScaleInfo]);
 
-  useEffect(() => {
-    if (!selectedCountry) {
-      setNewsArticles([]);
-      setNewsError("");
-      setNewsWarning("");
-      setNewsLoading(false);
-      return;
-    }
-
-    const cached = newsCacheRef.current.get(selectedCountry);
-    if (cached) {
-      setNewsArticles(cached.articles);
-      setNewsWarning(cached.warning ?? "");
-      setNewsError("");
-      setNewsLoading(false);
-      return;
-    }
-
-    const controller = new AbortController();
-
-    setNewsLoading(true);
-    setNewsError("");
-    setNewsWarning("");
-    setNewsArticles([]);
-
-    const timer = window.setTimeout(async () => {
-      try {
-        const url = apiUrl(`/api/climate-news?country=${encodeURIComponent(selectedCountry)}&limit=5`);
-        const res = await fetch(url, { signal: controller.signal });
-        const raw: unknown = await res.json().catch(() => null);
-
-        if (!res.ok) {
-          const message = (raw as any)?.error;
-          throw new Error(
-            typeof message === "string"
-              ? message
-              : "Failed to load /api/climate-news",
-          );
-        }
-
-        if (!isNewsResponse(raw)) {
-          throw new Error("Unexpected response shape from /api/climate-news");
-        }
-
-        newsCacheRef.current.set(selectedCountry, {
-          articles: raw.articles,
-          warning: raw.warning,
-        });
-        setNewsArticles(raw.articles);
-        setNewsWarning(raw.warning ?? "");
-        setNewsError("");
-      } catch (e) {
-        if (controller.signal.aborted) return;
-        setNewsArticles([]);
-        setNewsError(
-          e instanceof Error ? e.message : "Failed to load climate news",
-        );
-      } finally {
-        if (!controller.signal.aborted) {
-          setNewsLoading(false);
-        }
-      }
-    }, 0);
-
-    return () => {
-      window.clearTimeout(timer);
-      controller.abort();
-    };
-  }, [selectedCountry, pinnedCountry]);
-
   return (
     <div className="choropleth-layout">
       <div className="choropleth-map-area">
-        <h2>Global Climate Choropleth</h2>
+        <h2>Where climate pressure is concentrated</h2>
+        <p className="analysis-subtitle">Darker areas indicate higher values for the selected metric and year.</p>
         {error ? (
           <p style={{ color: "#b00020", margin: "0 0 8px" }}>{error}</p>
         ) : null}
@@ -539,76 +484,64 @@ function ChoroplethMap() {
           </div>
         </div>
 
-        <div className="news-panel">
-          <div className="news-header">
-            <div className="news-title">Latest News</div>
-            <button
-              type="button"
-              className="news-pin-btn"
-              disabled={!selectedCountry}
-              onClick={() => {
-                if (!selectedCountry) return;
-                setPinnedCountry((prev) =>
-                  prev === selectedCountry ? null : selectedCountry,
-                );
-              }}
-            >
-              {pinnedCountry ? "Unpin" : "Pin"}
-            </button>
-          </div>
-          <div className="news-hint">
-            {selectedCountry
-              ? "Click a country on the map to pin/unpin."
-              : "Hover on the map to preview headlines."}
-          </div>
-
-          <div className="news-country">
-            {selectedCountry ? selectedCountry : "Hover a country"}
-          </div>
-
-          {newsError ? <div className="news-error">{newsError}</div> : null}
-          {newsWarning ? (
-            <div className="news-warning">{newsWarning}</div>
-          ) : null}
-
-          <ol
-            key={selectedCountry ?? "none"}
-            ref={newsListRef}
-            className="news-list"
-          >
-            {!selectedCountry ? (
-              <li className="news-item">
-                <span className="news-hint">
-                  Hover on the map to load headlines.
-                </span>
-              </li>
-            ) : newsLoading ? (
-              <li className="news-item">
-                <span className="news-hint">Loading…</span>
-              </li>
-            ) : newsError ? (
-              <li className="news-item">
-                <span className="news-error">Unable to load headlines.</span>
-              </li>
-            ) : newsArticles.length ? (
-              newsArticles.map((a) => (
-                <li key={a.url} className="news-item">
-                  <a
-                    className="news-link"
-                    href={a.url}
-                    target="_blank"
-                    rel="noreferrer"
-                  >
-                    {a.title}
-                  </a>
-                </li>
-              ))
-            ) : (
-              <li className="news-item">
-                <span className="news-hint">No recent results found.</span>
-              </li>
-            )}
-          </ol>
+        <div className="map-insight-panel">
+          <p className="map-insight-panel__kicker">Country focus</p>
+          <h3 className="map-insight-panel__title">
+            {selectedCountry ?? "Select a country"}
+          </h3>
+          {selectedCountry ? (
+            <>
+              <div className="map-insight-value">
+                {selectedValue === null ? "No data" : formatMetricValue(selectedValue, metric)}
+                <span>{formatMetric(metric)}</span>
+              </div>
+              <p className="map-insight-copy">
+                {metric === "vulnerability"
+                  ? selectedValue === null
+                    ? "This country has no value for the selected year."
+                    : selectedValue >= colorScaleInfo.legendMax * 0.7
+                      ? "This sits in the higher-risk end of the current global distribution."
+                      : "This sits below the higher-risk end of the current global distribution."
+                  : "Use this score as a comparison point, then check readiness in the gap view."}
+              </p>
+              <button
+                type="button"
+                className="map-clear-btn"
+                onClick={() => setPinnedCountry(null)}
+              >
+                Clear selection
+              </button>
+              <div className="country-news">
+                <div className="country-news__header">
+                  <span>Recent reporting</span>
+                  {newsLoading ? <span>Loading...</span> : null}
+                </div>
+                {newsWarning ? <p className="country-news__status">{newsWarning}</p> : null}
+                {newsError ? <p className="country-news__status country-news__status--error">{newsError}</p> : null}
+                {!newsLoading && !newsError && newsArticles.length === 0 ? (
+                  <p className="country-news__status">No recent climate reports found.</p>
+                ) : null}
+                <ul className="country-news__list">
+                  {newsArticles.map((article) => (
+                    <li key={article.url}>
+                      <a href={article.url} target="_blank" rel="noreferrer">{article.title}</a>
+                      {article.source ? <small>{article.source}</small> : null}
+                    </li>
+                  ))}
+                </ul>
+              </div>
+            </>
+          ) : (
+            <>
+              <p className="map-insight-copy">
+                Hover for a quick value. Click once to hold a country here while you read the map.
+              </p>
+              <div className="country-news country-news--empty">
+                <div className="country-news__header">Country reporting</div>
+                <p className="country-news__status">Click a country to see recent climate reports here.</p>
+              </div>
+            </>
+          )}
         </div>
       </div>
 

@@ -12,7 +12,7 @@ The project is designed around one question:
 - **Policy comparison scatter plot** — Compare vulnerability with readiness and use bubble size to represent another readiness metric.
 - **Country focus** — Select or click a country in the scatter plot to highlight it while comparing it with the global context.
 - **Climate news word map** — Explore recent climate-news topics and open related articles.
-- **Country news panel** — Hover over or pin a country on the map to load recent climate-related coverage.
+- **Country news panel** — Click a country on the map to load recent climate-related coverage.
 
 ## Architecture
 
@@ -192,7 +192,7 @@ This endpoint uses ReliefWeb reports and requires an approved `RELIEFWEB_APPNAME
 GET /api/climate-news-wordmap?timespan=24h&maxrecords=80&top=60
 ```
 
-This endpoint uses GDELT to retrieve recent climate-related article titles and extract frequently occurring terms.
+This endpoint uses GDELT to retrieve recent climate-related article titles and extract frequently occurring terms. Results are cached locally for 15 minutes, and the last cached result is returned when GDELT is rate-limited or unavailable.
 
 ## Validation
 
