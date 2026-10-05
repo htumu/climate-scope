@@ -11,7 +11,6 @@ The project is designed around one question:
 - **Risk map** — Explore ND-GAIN vulnerability, readiness, overall gain, and readiness dimensions by country and year.
 - **Policy comparison scatter plot** — Compare vulnerability with readiness and use bubble size to represent another readiness metric.
 - **Country focus** — Select or click a country in the scatter plot to highlight it while comparing it with the global context.
-- **Climate news word map** — Explore recent climate-news topics and open related articles.
 - **Country news panel** — Click a country on the map to load recent climate-related coverage.
 
 ## Architecture
@@ -60,14 +59,12 @@ backend/
   app.py
   routes/climate_data_routes.py
   services/nd_gain_service.py
-  services/gdelt_service.py
   services/reliefweb_service.py
   scripts/process_nd_gain.py
   data/nd_gain_country_year.csv
 frontend/
   src/components/ChoroplethMap.tsx
   src/components/BubbleScatterPlot.tsx
-  src/components/NewsWordMap.tsx
 ```
 
 ## Local Setup
@@ -186,14 +183,6 @@ GET /api/climate-news?country=India&limit=5
 
 This endpoint uses ReliefWeb reports and requires an approved `RELIEFWEB_APPNAME`. Cached results may be returned when the external service is unavailable.
 
-### Climate news word map
-
-```text
-GET /api/climate-news-wordmap?timespan=24h&maxrecords=80&top=60
-```
-
-This endpoint uses GDELT to retrieve recent climate-related article titles and extract frequently occurring terms. Results are cached locally for 15 minutes, and the last cached result is returned when GDELT is rate-limited or unavailable.
-
 ## Validation
 
 Build the frontend:
@@ -252,16 +241,3 @@ Then build:
 cd frontend
 npm run build
 ```
-
-Before production deployment:
-
-1. Use a production frontend host and set `VITE_API_BASE_URL` there.
-2. Keep the normalized ND-GAIN CSV available to the deployed backend.
-3. Restrict `CORS_ORIGINS` to the deployed frontend origin.
-4. Do not commit `.env` files or service credentials.
-
-No database is required for the current read-only dataset. PostgreSQL can be added later if the project gains user accounts, saved comparisons, scheduled updates, or larger data sources.
-
-## Data Attribution
-
-Document the official ND-GAIN source, GDELT, ReliefWeb, and any other data providers in the final portfolio version. Include retrieval dates and links when publishing the project.
