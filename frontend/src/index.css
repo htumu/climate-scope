@@ -47,7 +47,7 @@ html, body {
 }
 
 h1,
-h2 {
+h2, h3 {
   font-family: var(--heading);
   font-weight: 500;
   color: var(--text-h);
@@ -74,6 +74,57 @@ h2 {
     --accent-bg: rgba(178, 81, 54, 0.1);
     --accent-border: rgba(178, 81, 54, 0.5);
 }
+h3 {
+  margin: 0;
+  font-size: 12px;
+  font-weight: 700;
+  color: #b25136;
+  text-transform: uppercase;
+  letter-spacing: 0.8px;
+}
+
+p {
+  margin: 0 0 12px;
+  font-size: 11px;
+  line-height: 1.5;
+  color: black;
+}
+
+select {
+  width: 100%;
+  padding: 7px 9px;
+  border-radius: 7px;
+  border: 1px solid rgba(255, 255, 255, 0.5);
+  background: rgba(255, 255, 255, 0.3);
+  color: #2c2c2c;
+  font-size: 12px;
+  cursor: pointer;
+}
+
+select:disabled{
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+label {
+  display: flex;
+  flex-direction: column;
+  gap: 5px;
+  font-size: 12px;
+  color: #b25136;
+  font-weight: 600;
+}
+
+span {
+  grid-row: span 2;
+  color: #b25136;
+  font-family: ui-monospace, Consolas, monospace;
+  font-size: 11px;
+  padding-top: 2px;
+}
+
+strong { color: #172a2b; font-size: 13px; }
+small { color: #687979; font-size: 11px; }
 
 code,
 .counter {

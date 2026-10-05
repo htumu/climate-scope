@@ -427,7 +427,6 @@ function ChoroplethMap() {
   return (
     <div className="choropleth-layout">
       <div className="choropleth-map-area">
-        <h2>Where climate pressure is concentrated</h2>
         <p className="analysis-subtitle">Darker areas indicate higher values for the selected metric and year.</p>
         {error ? (
           <p style={{ color: "#b00020", margin: "0 0 8px" }}>{error}</p>
@@ -438,8 +437,6 @@ function ChoroplethMap() {
       </div>
 
       <div className="map-sidebar">
-        <h3>Controls</h3>
-
         <label>
           Metric
           <select
@@ -485,10 +482,7 @@ function ChoroplethMap() {
         </div>
 
         <div className="map-insight-panel">
-          <p className="map-insight-panel__kicker">Country focus</p>
-          <h3 className="map-insight-panel__title">
-            {selectedCountry ?? "Select a country"}
-          </h3>
+          <h3 className="map-insight-panel__kicker">{selectedCountry ?? "Select a country"}</h3>
           {selectedCountry ? (
             <>
               <div className="map-insight-value">
@@ -537,7 +531,7 @@ function ChoroplethMap() {
                 Hover for a quick value. Click once to hold a country here while you read the map.
               </p>
               <div className="country-news country-news--empty">
-                <div className="country-news__header">Country reporting</div>
+                {/* <div className="country-news__header">Country reporting</div> */}
                 <p className="country-news__status">Click a country to see recent climate reports here.</p>
               </div>
             </>

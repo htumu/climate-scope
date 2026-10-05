@@ -249,9 +249,9 @@ function BubbleScatterPlot() {
             .attr('cx', (d) => xScale(d.x))
             .attr('cy', (d) => yScale(d.y))
             .attr('r', 0)
-            .attr('fill', '#294344')
+            .attr('fill', '#b25136')
             .attr('fill-opacity', (d) => selectedCountry && d.country !== selectedCountry ? 0.12 : 0.5)
-            .attr('stroke', (d) => d.country === selectedCountry ? '#111827' : '#294344')
+            .attr('stroke', (d) => d.country === selectedCountry ? '#111827' : '#b25136')
             .attr('stroke-width', (d) => d.country === selectedCountry ? 3 : 1.5)
             .on('mousemove', (event: MouseEvent, d) => {
                 setScatterTooltip({
@@ -389,7 +389,7 @@ function BubbleScatterPlot() {
                                 const nextYear = meta?.years?.[index]
                                 if (typeof nextYear === 'number') setScatterYear(nextYear)
                             }}
-                            style={{ width: '100%', marginTop: 6, accentColor: '#a7c6ae' }}
+                            style={{ width: '100%', accentColor: '#b25136' }}
                             disabled={!meta || (meta?.years?.length ?? 0) === 0}
                         />
                     </div>
@@ -397,7 +397,11 @@ function BubbleScatterPlot() {
 
                 <div className="scatter-plot-area">
                     <h2>When vulnerability outpaces readiness</h2>
-                    <p className="analysis-subtitle">Countries toward the upper-right face more pressure and have more capacity; the most exposed, least ready sit in the upper-left.</p>
+                    <p className="analysis-subtitle">
+                        Move the year slider (data available from 1995 to 2024), 
+                        then press play to see how these patterns and trends change over time. 
+                        The five countries with the largest values are labeled.
+                    </p>
                     {scatterError ? <p style={{ color: '#b00020', margin: '0 0 8px' }}>{scatterError}</p> : null}
                     <svg
                         ref={scatterSvgRef}

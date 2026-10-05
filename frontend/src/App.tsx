@@ -57,21 +57,38 @@ function App() {
         {!hasEntered ? (
           <section className="story-intro story-intro--entry">
           <div className="story-intro__copy">
-            <p className="story-kicker">The central question</p>
-            <h2>Who faces the most climate risk, and who has the capacity to respond?</h2>
-            <p>
-              Climate harm is not only about exposure. It becomes most urgent when
-              high vulnerability meets low readiness. Use the map to see the global
-              pattern, then move to the gap view to compare countries directly.
-            </p>
-            <button type="button" className="story-intro__cta" onClick={() => setHasEntered(true)}>
-              Explore the data <span aria-hidden="true">→</span>
-            </button>
+           <h2>
+            Climate risk doesn’t fall evenly. So who is most at risk and who is ready to respond?
+          </h2>
+
+          <h3>
+            Some countries are facing much more climate pressure than others. And
+            having the resources to prepare, adapt, and recover can make all the
+            difference. Explore the map to see where the pressure is greatest, then
+            compare countries to see where vulnerability and capacity fall out of balance.
+          </h3>
+
+          <button
+            type="button"
+            className="story-intro__cta"
+            onClick={() => setHasEntered(true)}
+          >
+            Explore the story &nbsp; →
+          </button>
           </div>
           <div className="story-intro__steps" aria-label="How to read the dashboard">
-            <div><span>01</span><strong>Locate pressure</strong><small>Where vulnerability is concentrated</small></div>
-            <div><span>02</span><strong>Compare capacity</strong><small>Whether readiness keeps pace</small></div>
-            <div><span>03</span><strong>Find the gap</strong><small>Where action matters most</small></div>
+            <div> <span>01</span> <strong>See where the pressure is</strong> <small>Explore where climate vulnerability is highest</small> </div>
+            <div>
+              <span>02</span>
+              <strong>Look at who is prepared</strong>
+              <small>Compare countries by their ability to respond</small>
+            </div>
+
+            <div>
+              <span>03</span>
+              <strong>See where the two meet</strong>
+              <small>Find the places facing the biggest challenge</small>
+            </div>
           </div>
           </section>
         ) : null}
